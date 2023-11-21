@@ -1,4 +1,5 @@
 const Blog = require('../models/blog');
+const Comment = require('../models/comment');
 
 
 const blogController = {
@@ -55,40 +56,39 @@ const blogController = {
       },
 
       addComment: async (req, res) => {
-        const { id } = req.params;
-        const { newcomment } = req.body;
+        const { comment, blogId } = req.body;
     
         try {
-            const blog = await Blog.findByPk(id);
+            const createdComment = await Comment.create({
+                blogid: blogId,
+                comment: comment,
+            });
+            console.log(blogId, comment);
+            res.status(200).json({createdComment });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
     
-            if (!blog) {
-                res.status(404).json({ error: 'Blog not found' });
+    
+    getCommentsById: async (req, res) => {
+        const { id } = req.params;
+    
+        try {
+            const comments = await Comment.findAll({
+                where: { blogid: id },
+            });
+    
+            if (comments.length === 0) {
+                res.json({ message: 'No comments found.' });
             } else {
-                let comments;
-
-                if (blog.blogcomment && blog.blogcomment.comArr) {
-                    comments = blog.blogcomment;
-                } else {
-                    comments = { comArr: [] };
-                }
-
-
-
-                let arr = [comments.comArr];
-                comments.comArr = arr.push(newcomment);
-
-                
-    
-                blog.blogcomment = comments;
-    
-                await blog.save();
-    
-                res.status(200).json({ success: 'Comment added successfully' });
+                res.json(comments);
             }
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
     },
+    
       
 }
 

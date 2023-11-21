@@ -1,26 +1,25 @@
-
 const serverUrl = 'http://localhost:3000/blogs';
-
 const blogform = document.getElementById('blogForm');
 const blogsContainer = document.getElementById('blogsContainer');
 
 blogform.addEventListener('submit', handleBlogAdd);
-const blogtitle = document.getElementById('blogtitle');
-const author = document.getElementById('author');
-const blogcontent = document.getElementById('blogcontent');
 
 function handleBlogAdd(event) {
     event.preventDefault();
 
+    const blogtitle = document.getElementById('blogtitle').value;
+    const author = document.getElementById('author').value;
+    const blogcontent = document.getElementById('blogcontent').value;
+
     const blogData = {
-        blogtitle: blogtitle.value,
-        blogauthor: author.value,
-        blogcontent: blogcontent.value,
+        blogtitle,
+        blogauthor: author,
+        blogcontent,
     };
 
-    axios.post(`${serverUrl}`, blogData) 
+    axios.post(`${serverUrl}`, blogData)
         .then(response => {
-            const uniqueId = response.id; 
+            const uniqueId = response.data.id;
             const blogElement = createBlogElement(blogData, uniqueId);
             blogsContainer.appendChild(blogElement);
             blogform.reset();
@@ -32,31 +31,6 @@ function handleBlogAdd(event) {
 
 function createBlogElement(blogData, uniqueId) {
     const blogElement = document.createElement('div');
-    const buttonDelete = document.createElement('button');
-    // const buttonEdit = document.createElement('button');
-
-    // buttonDelete.textContent = 'Delete';
-    // buttonEdit.textContent = 'Edit';
-    // buttonDelete.className = 'btn btn-danger mr-2';
-    // buttonEdit.className = 'btn btn-primary';
-
-    // buttonDelete.addEventListener('click', function () {
-    //     blogElement.remove();
-    //     handleBlogDelete(uniqueId);
-    // });
-
-    // buttonEdit.addEventListener('click', function () {
-    //     axios.get(`${serverUrl}/expenses/${uniqueId}`, { withCredentials: true })
-    //     .then((response) => {
-    //         console.log(response);
-    //         const storedData = response.data;
-    //         amountInput.value = storedData.amount;
-    //         descriptionInput.value = storedData.description;
-    //         categorySelect.value = storedData.category;
-    //         expenseElement.remove();
-    //         handleExpenseDelete(uniqueId);
-    //     });
-    // });
 
     blogElement.className = 'list-group-item';
     blogElement.innerHTML = `
@@ -65,42 +39,87 @@ function createBlogElement(blogData, uniqueId) {
             <div class="card card-body">
                 <div class="blog-body">
                     <p><strong>Author:</strong> ${blogData.blogauthor}</p>
-                    <p>
-                    ${blogData.blogcontent}
-                    </p>
+                    <p>${blogData.blogcontent}</p>
                     <div class="form-group mt-3">
                         <label for="comment">Add a Comment:</label>
                         <textarea class="form-control" id="comment" rows="3" placeholder="Write your comment here"></textarea>
+                        <button class="btn btn-primary mt-2" type="button" onclick="postComment(${uniqueId})">Post Comment</button>
                     </div>
-                    <button class="btn btn-primary" type="submit">Post Comment</button>
+                    <ul id="commentList${uniqueId}" class="list-group mt-3"></ul>
                 </div>
-                <ul class="list-group mt-3">
-                    <li class="list-group-item">Comment 1</li>
-                    <li class="list-group-item">Comment 2</li>
-                </ul>
             </div>
         </div>
     `;
-    // expenseElement.appendChild(buttonDelete);
-    // expenseElement.appendChild(buttonEdit);
+
+    // Fetch and render comments
+    const commentListElement = blogElement.querySelector(`#commentList${uniqueId}`);
+    fetchComments(uniqueId).then(comments => renderComments(commentListElement, comments));
 
     return blogElement;
 }
 
-function showAllBlogs() {
-    axios.get(`${serverUrl}`, { withCredentials: true }) 
-        .then(response => {
-            const blogs = response.data;
-            console.log(blogs);
-            blogs.forEach(blog => {
-                const blogElement = createBlogElement(blog, blog.id); 
-                blogsContainer.appendChild(blogElement);
-            });
-        })
-        .catch(error => {
-            console.error('Error fetching expenses:', error);
-        });
+async function fetchComments(blogId) {
+    try {
+        const response = await axios.get(`${serverUrl}/${blogId}/comment`);
+        console.log(response.data);
+        return response.data;
+
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        return [];
+    }
 }
 
+function renderComments(commentListElement, comments) {
+    commentListElement.innerHTML = '';
+
+    if(comments){comments.forEach(comment => {
+        const commentItem = document.createElement('li');
+        commentItem.className = 'list-group-item';
+        commentItem.textContent = comment.comment;
+        commentListElement.appendChild(commentItem);
+    });}
+}
+
+async function postComment(blogId) {
+    const commentInput = document.getElementById('comment');
+    const newComment = commentInput.value;
+
+    await postCommentToServer(blogId, newComment);
+
+    const commentListElement = document.getElementById(`commentList${blogId}`);
+    const updatedComments = await fetchComments(blogId);
+    renderComments(commentListElement, updatedComments);
+}
+
+async function postCommentToServer(blogId, comment) {
+    try {
+        const response = await axios.post(`${serverUrl}/comment`, { comment , blogId});
+        console.log(response.comment); // Log the response to check for success messages or errors
+    } catch (error) {
+        console.error('Error posting comment:', error);
+    }
+}
+
+
+
+async function showAllBlogs() {
+    try {
+        const response = await axios.get(`${serverUrl}`, { withCredentials: true });
+        const blogs = response.data;
+
+        for (const blog of blogs) {
+            const blogElement = createBlogElement(blog, blog.id);
+            blogsContainer.appendChild(blogElement);
+
+            // Fetch and render comments for each blog
+            const commentListElement = document.getElementById(`commentList${blog.id}`);
+            const comments = await fetchComments(blog.id);
+            renderComments(commentListElement, comments);
+        }
+    } catch (error) {
+        console.error('Error fetching blogs:', error);
+    }
+}
 
 showAllBlogs();
